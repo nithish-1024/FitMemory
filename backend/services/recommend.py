@@ -34,8 +34,8 @@ DRESS_TYPES = {"dress"}
 
 FALLBACK_REASONING = "Fallback outfit based on wardrobe basics."
 FALLBACK_IMAGE_PROMPT = (
-    "A model wearing a clean, classic outfit styled with wardrobe essentials, "
-    "photorealistic, 35mm film, soft studio lighting, high fashion editorial lookbook"
+    "Full-body fashion editorial lookbook photography of a stylish person wearing clean classic wardrobe essentials, "
+    "standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture."
 )
 
 
@@ -195,8 +195,8 @@ def get_discover_fallback(
         "The curated pairing establishes tonal depth according to core color theory principles."
     )
     image_prompt = (
-        f"Fashion editorial photo of a model wearing {base_item.get('name', 'owned wardrobe piece')} "
-        f"styled with a brand-new {new_color} {new_name}, photorealistic, 35mm film, soft studio lighting, high fashion editorial lookbook"
+        f"Full-body fashion editorial lookbook photography of a stylish person wearing {base_item.get('name', 'owned wardrobe piece')} "
+        f"paired with a new {new_color} {new_name}, standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture."
     )
     return [base_item["id"]], new_item, reasoning, image_prompt
 
@@ -233,9 +233,12 @@ def validate_outfit(
 
 
 def build_image_url(image_prompt: str) -> str:
-    """Build pollinations.ai image URL with high-fashion editorial styling tags."""
-    editorial_tags = "photorealistic, 35mm film, soft studio lighting, high fashion editorial lookbook"
-    if "photorealistic" not in image_prompt.lower():
+    """Build pollinations.ai image URL routing to FLUX photorealistic model with luxury editorial tags."""
+    editorial_tags = (
+        "standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, "
+        "photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture"
+    )
+    if "hyper-realistic" not in image_prompt.lower() and "photorealistic" not in image_prompt.lower():
         full_prompt = f"{image_prompt}, {editorial_tags}"
     else:
         full_prompt = image_prompt
@@ -252,7 +255,7 @@ def build_image_url(image_prompt: str) -> str:
     encoded_prompt = urllib.parse.quote(normalized.strip())
     return (
         f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        "?width=768&height=1024&nologo=true"
+        "?width=768&height=1024&model=flux&nologo=true"
     )
 
 
@@ -349,7 +352,7 @@ def recommend(
             "1. Select 1 or 2 item_ids from the user's available wardrobe list that will form the base.\n"
             "2. Invent ONE new complementary fashion piece ('new_item') with 'id' ('new_piece_suggested'), 'name', 'category', 'color', 'fit', and 'reasoning' (explaining why it elevates the wardrobe).\n"
             "3. Provide 'reasoning' in exactly 2 sentences explaining why this new item pairs harmoniously with the chosen owned piece(s).\n"
-            "4. Provide 'image_prompt' describing a fashion model wearing the complete styled outfit (owned items + new item) in an editorial fashion photography setting.\n\n"
+            "4. Provide 'image_prompt' following this template: Full-body fashion editorial lookbook photography of a stylish person wearing [exact items], standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture.\n\n"
             "Return strict JSON only in this format:\n"
             "{\n"
             '  "item_ids": ["owned_id_1"],\n'
@@ -375,7 +378,7 @@ def recommend(
             "item_ids: 2-4 ids from the wardrobe, must form a wearable outfit (one top or dress, "
             "one bottom unless a dress, footwear if available).\n"
             "reasoning: exactly 2 sentences, naming the specific rule or learned preference applied.\n"
-            "image_prompt: a detailed prompt for generating a styled look photo of a person wearing these exact items (high fashion editorial lookbook style, 35mm film)."
+            "image_prompt: Full-body fashion editorial lookbook photography of a stylish person wearing these exact items, standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture."
         )
         user_message = (
             f"Wardrobe items:\n{json.dumps(compact_wardrobe)}\n\n"

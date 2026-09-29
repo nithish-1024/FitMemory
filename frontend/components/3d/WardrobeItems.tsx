@@ -116,6 +116,7 @@ interface SingleSpiralCardProps {
   isSelected: boolean;
   onSelect: (item: WardrobeItem) => void;
   targetScrollRef: React.MutableRefObject<number>;
+  entranceProgressRef: React.MutableRefObject<number>;
 }
 
 function SingleSpiralCard({
@@ -125,6 +126,7 @@ function SingleSpiralCard({
   isSelected,
   onSelect,
   targetScrollRef,
+  entranceProgressRef,
 }: SingleSpiralCardProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
@@ -217,12 +219,29 @@ function SingleSpiralCard({
     const currentScroll = currentScrollRef.current;
     const diff = index - currentScroll;
     const angleStep = Math.PI / 4; // 8 cards per revolution
-    const theta = diff * angleStep;
-    const R = 2.2;
+    const targetTheta = diff * angleStep;
+
+    // 1.8-second Cinematic Helix Bloom entrance animation
+    const progress = entranceProgressRef.current;
+    // Stagger slightly per card by index
+    const cardDelay = (index % 8) * 0.035;
+    const cardProgress = THREE.MathUtils.clamp(
+      (progress - cardDelay) / Math.max(0.01, 1 - cardDelay),
+      0,
+      1
+    );
+    // Smooth cubic ease-out
+    const easedProgress = 1 - Math.pow(1 - cardProgress, 3);
+
+    // 1. Radius blooms outward: R = THREE.MathUtils.lerp(0.5, 2.2, easedProgress)
+    const R = THREE.MathUtils.lerp(0.5, 2.2, easedProgress);
+
+    // 2. Cascade into position with staggered rotation: theta = THREE.MathUtils.lerp(targetTheta - 1.2, targetTheta, easedProgress)
+    const theta = THREE.MathUtils.lerp(targetTheta - 1.2, targetTheta, easedProgress);
 
     const x = R * Math.sin(theta);
     const z = R * Math.cos(theta);
-    const y = -diff * 0.42;
+    const y = THREE.MathUtils.lerp(-diff * 0.42 - 0.35, -diff * 0.42, easedProgress);
 
     groupRef.current.position.set(x, y, z);
     groupRef.current.rotation.y = theta;
@@ -232,19 +251,22 @@ function SingleSpiralCard({
     const focus = Math.max(0, 1 - dist * 0.7);
 
     // Front card scales to 1.15x
-    const baseScale = THREE.MathUtils.lerp(0.9, 1.15, focus);
-    const scale = hovered || isSelected ? baseScale * 1.05 : baseScale;
+    const fullScale = THREE.MathUtils.lerp(0.9, 1.15, focus);
+    const targetScale = hovered || isSelected ? fullScale * 1.05 : fullScale;
+
+    // 3. Cards scale smoothly from 0.2 to their full scale
+    const scale = THREE.MathUtils.lerp(0.2, targetScale, easedProgress);
     groupRef.current.scale.set(scale, scale, scale);
 
-    // Subtle gentle breath on front-focused card
-    if (dist < 0.35) {
+    // Subtle gentle breath on front-focused card once fully bloomed
+    if (dist < 0.35 && easedProgress > 0.95) {
       groupRef.current.rotation.z = Math.sin(Date.now() * 0.0018) * 0.015;
     } else {
       groupRef.current.rotation.z = 0;
     }
 
     // Only render cards reasonably close to the camera field
-    groupRef.current.visible = dist < 5.0;
+    groupRef.current.visible = dist < 5.0 && easedProgress > 0.02;
   });
 
   return (
@@ -389,6 +411,7 @@ export interface WardrobeItemsProps {
   onSelectItem: (item: WardrobeItem) => void;
   activeIndex?: number;
   onActiveIndexChange?: (index: number) => void;
+  entranceProgress?: number;
 }
 
 export function WardrobeItems({
@@ -398,10 +421,15 @@ export function WardrobeItems({
   onSelectItem,
   activeIndex,
   onActiveIndexChange,
+  entranceProgress,
 }: WardrobeItemsProps) {
   const targetScrollRef = useRef(0);
   const currentScrollRef = useRef(0);
   const lastReportedIndex = useRef(0);
+
+  // 1.8-second Cinematic Helix Bloom entrance animation controller
+  const entranceTimeRef = useRef(0);
+  const entranceProgressRef = useRef(0);
 
   // Sync external activeIndex if provided (e.g. from Prev/Next buttons)
   useEffect(() => {
@@ -410,11 +438,13 @@ export function WardrobeItems({
     }
   }, [activeIndex]);
 
-  // Reset scroll position when items/user changes
+  // Reset scroll position and entrance bloom animation when items/user changes
   useEffect(() => {
     targetScrollRef.current = 0;
     currentScrollRef.current = 0;
     lastReportedIndex.current = 0;
+    entranceTimeRef.current = 0;
+    entranceProgressRef.current = 0;
     onActiveIndexChange?.(0);
   }, [items, onActiveIndexChange]);
 
@@ -483,8 +513,8 @@ export function WardrobeItems({
     };
   }, [items.length]);
 
-  // Frame loop for smooth damping and active index notification
-  useFrame(() => {
+  // Frame loop for smooth damping, active index notification, and 1.8s entrance bloom
+  useFrame((_, delta) => {
     currentScrollRef.current = THREE.MathUtils.lerp(
       currentScrollRef.current,
       targetScrollRef.current,
@@ -495,6 +525,16 @@ export function WardrobeItems({
     if (rounded !== lastReportedIndex.current) {
       lastReportedIndex.current = rounded;
       onActiveIndexChange?.(rounded);
+    }
+
+    // Advance 1.8s Cinematic Helix Bloom entrance animation
+    if (typeof entranceProgress === "number") {
+      entranceProgressRef.current = entranceProgress;
+    } else if (entranceProgressRef.current < 1) {
+      entranceTimeRef.current += delta;
+      const raw = Math.min(1, entranceTimeRef.current / 1.8);
+      // Smooth cubic ease-out
+      entranceProgressRef.current = 1 - Math.pow(1 - raw, 3);
     }
   });
 
@@ -515,6 +555,7 @@ export function WardrobeItems({
           index={index}
           currentScrollRef={currentScrollRef}
           targetScrollRef={targetScrollRef}
+          entranceProgressRef={entranceProgressRef}
           isSelected={item.id === selectedItemId}
           onSelect={onSelectItem}
         />

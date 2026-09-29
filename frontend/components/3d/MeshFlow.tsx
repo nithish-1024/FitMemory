@@ -6,32 +6,31 @@ import * as THREE from "three";
 
 export function MeshFlow() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const wireRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const particlesRef = useRef<THREE.Points>(null);
 
-  // High-resolution subdivided plane for organic wave deformation
+  // High-resolution subdivided plane for organic cloth wave deformation
   const [geometry, originalPositions] = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(12, 6.5, 64, 48);
+    const geo = new THREE.PlaneGeometry(13, 7.5, 72, 54);
     const pos = geo.attributes.position;
     const orig = new Float32Array(pos.array.length);
     orig.set(pos.array);
     return [geo, orig];
   }, []);
 
-  // Glowing particle motes along the flow
+  // Soft glowing stardust motes floating around the liquid satin
   const [particlePositions, particleSpeeds] = useMemo(() => {
-    const count = 180;
+    const count = 140;
     const pos = new Float32Array(count * 3);
     const spd = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 11;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 5;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 3;
+      pos[i * 3] = (Math.random() - 0.5) * 12;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 6;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 3.5;
 
-      spd[i * 3] = 0.002 + Math.random() * 0.004;
-      spd[i * 3 + 1] = (Math.random() - 0.5) * 0.002;
-      spd[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
+      spd[i * 3] = 0.0015 + Math.random() * 0.003;
+      spd[i * 3 + 1] = (Math.random() - 0.5) * 0.0015;
+      spd[i * 3 + 2] = (Math.random() - 0.5) * 0.0015;
     }
     return [pos, spd];
   }, []);
@@ -39,7 +38,7 @@ export function MeshFlow() {
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
 
-    // 1. Dynamic Wave Vertex Displacement
+    // 1. Organic Heavy Silk & Satin Wave Undulation
     if (meshRef.current) {
       const posAttr = meshRef.current.geometry.attributes.position;
       const arr = posAttr.array as Float32Array;
@@ -48,23 +47,16 @@ export function MeshFlow() {
         const ox = originalPositions[i];
         const oy = originalPositions[i + 1];
 
-        // Complex multi-frequency organic flow wave
-        const wave1 = Math.sin(ox * 0.65 + t * 1.1) * 0.55;
-        const wave2 = Math.cos(oy * 0.85 + t * 0.9) * 0.45;
-        const wave3 = Math.sin((ox + oy) * 0.45 + t * 1.3) * 0.35;
-        const wave4 = Math.cos(Math.hypot(ox, oy) * 0.5 - t * 1.5) * 0.25;
+        // Smooth, heavy liquid fabric displacement math
+        const wave1 = Math.sin(ox * 0.42 + t * 0.65) * 0.52;
+        const wave2 = Math.cos(oy * 0.52 + t * 0.55) * 0.42;
+        const wave3 = Math.sin((ox * 0.35 + oy * 0.4) + t * 0.75) * 0.32;
+        const wave4 = Math.cos(Math.hypot(ox * 0.35, oy * 0.45) - t * 0.8) * 0.22;
 
         arr[i + 2] = wave1 + wave2 + wave3 + wave4;
       }
       posAttr.needsUpdate = true;
       meshRef.current.geometry.computeVertexNormals();
-
-      // Synchronize wireframe geometry
-      if (wireRef.current) {
-        const wirePosAttr = wireRef.current.geometry.attributes.position;
-        (wirePosAttr.array as Float32Array).set(arr);
-        wirePosAttr.needsUpdate = true;
-      }
     }
 
     // 2. Interactive Pointer Parallax Tilt
@@ -74,29 +66,29 @@ export function MeshFlow() {
 
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        px * 0.25,
-        0.05
+        px * 0.2,
+        0.04
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
         groupRef.current.rotation.x,
-        -py * 0.2 - 0.15,
-        0.05
+        -py * 0.16 - 0.1,
+        0.04
       );
       groupRef.current.position.y = THREE.MathUtils.lerp(
         groupRef.current.position.y,
-        Math.sin(t * 0.5) * 0.12,
-        0.05
+        Math.sin(t * 0.4) * 0.1,
+        0.04
       );
     }
 
-    // 3. Drift Floating Motes
+    // 3. Floating Motes Drift
     if (particlesRef.current) {
       const posAttr = particlesRef.current.geometry.attributes.position;
       const arr = posAttr.array as Float32Array;
       for (let i = 0; i < arr.length; i += 3) {
         arr[i] += particleSpeeds[i];
         arr[i + 1] += particleSpeeds[i + 1];
-        if (arr[i] > 6) arr[i] = -6;
+        if (arr[i] > 6.5) arr[i] = -6.5;
       }
       posAttr.needsUpdate = true;
     }
@@ -104,42 +96,29 @@ export function MeshFlow() {
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
-      {/* Dynamic Lighting for Mesh Flow */}
-      <ambientLight color="#1A1815" intensity={1.5} />
-      <pointLight position={[-3, 2, 3]} intensity={4.5} color="#3B4CCF" distance={10} />
-      <pointLight position={[3, -1, 2]} intensity={3.5} color="#F5F1E8" distance={8} />
-      <pointLight position={[0, -2, -2]} intensity={2.0} color="#3B4CCF" distance={7} />
+      {/* Studio Lighting tailored to highlight satin sheen */}
+      <ambientLight color="#FAF6F0" intensity={0.9} />
+      <directionalLight position={[4, 5, 5]} intensity={2.8} color="#FFF8EE" />
+      <pointLight position={[-4, 2, 3]} intensity={3.5} color="#7A6AD6" distance={12} />
+      <pointLight position={[3, -2, 2]} intensity={2.2} color="#C5A059" distance={9} />
+      <pointLight position={[0, -3, -2]} intensity={1.8} color="#3B4CCF" distance={8} />
 
-      {/* Surface 1: Translucent Glowing Mesh Ribbon */}
+      {/* Luxury Liquid Silk & Satin Cloth Surface */}
       <mesh ref={meshRef} geometry={geometry}>
         <meshPhysicalMaterial
-          color="#1A1815"
-          emissive="#1F2A7A"
-          emissiveIntensity={0.65}
-          roughness={0.25}
-          metalness={0.7}
-          clearcoat={1.0}
-          clearcoatRoughness={0.2}
-          transmission={0.4}
-          opacity={0.88}
-          transparent
-          side={THREE.DoubleSide}
-          wireframe={false}
-        />
-      </mesh>
-
-      {/* Surface 2: Electric Indigo Wireframe Lattice Overlay */}
-      <mesh ref={wireRef} geometry={geometry.clone()}>
-        <meshBasicMaterial
-          color="#3B4CCF"
-          wireframe
-          transparent
-          opacity={0.38}
+          color="#F5EFE6"
+          roughness={0.32}
+          metalness={0.12}
+          clearcoat={0.35}
+          clearcoatRoughness={0.25}
+          sheen={1.0}
+          sheenColor="#7A6AD6"
+          sheenRoughness={0.3}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Floating Stardust Particles */}
+      {/* Floating Warm Champagne Stardust Motes */}
       <points ref={particlesRef}>
         <bufferGeometry>
           <bufferAttribute
@@ -150,10 +129,10 @@ export function MeshFlow() {
           />
         </bufferGeometry>
         <pointsMaterial
-          size={0.045}
-          color="#F5F1E8"
+          size={0.04}
+          color="#E8E2D5"
           transparent
-          opacity={0.55}
+          opacity={0.65}
           sizeAttenuation
           depthWrite={false}
           blending={THREE.AdditiveBlending}
