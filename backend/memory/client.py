@@ -22,9 +22,13 @@ class _BackgroundLoop:
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
 
-    def run(self, coro):
+    def run(self, coro, timeout: float = 3.5):
         fut = asyncio.run_coroutine_threadsafe(coro, self.loop)
-        return fut.result()
+        try:
+            return fut.result(timeout=timeout)
+        except Exception as e:
+            logger.warning(f"Hindsight async call timed out or failed ({e}); returning fallback.")
+            return None
 
 
 _bg_loop = _BackgroundLoop()
@@ -85,7 +89,8 @@ class MemoryClient:
             except Exception:
                 return True
 
-        return _bg_loop.run(_check())
+        res = _bg_loop.run(_check())
+        return True if res is None else bool(res)
 
     def delete_document(self, bank: str, doc_id: str) -> bool:
         """Delete a document from Hindsight bank if it exists."""
@@ -101,7 +106,8 @@ class MemoryClient:
                 logger.warning(f"Error deleting document '{doc_id}' from bank '{bank}': {e}")
                 return False
 
-        return _bg_loop.run(_delete())
+        res = _bg_loop.run(_delete())
+        return False if res is None else bool(res)
 
     def list_documents(self, bank: str, limit: int = 100) -> list[str]:
         """List document IDs in a bank."""
@@ -115,7 +121,8 @@ class MemoryClient:
                 logger.warning(f"Error listing documents in bank '{bank}': {e}")
                 return []
 
-        return _bg_loop.run(_list())
+        res = _bg_loop.run(_list())
+        return res if res is not None else []
 
     def seed_document(
         self, bank: str, doc_id: str, content: str, metadata: dict, overwrite: bool = False
@@ -155,7 +162,12 @@ class MemoryClient:
                 "metadata": metadata,
             }
 
-        return _bg_loop.run(_seed())
+        res = _bg_loop.run(_seed())
+        return res if res is not None else {
+            "doc_id": doc_id,
+            "content": content,
+            "metadata": metadata,
+        }
 
     def seed_documents_batch(
         self, bank: str, docs: list[dict], concurrency: int = 8
@@ -193,7 +205,8 @@ class MemoryClient:
             await asyncio.gather(*(_seed_one(d) for d in docs))
             return seeded_ids
 
-        return _bg_loop.run(_batch())
+        res = _bg_loop.run(_batch())
+        return res if res is not None else []
 
     async def _aget_document(self, bank: str, doc_id: str) -> Optional[dict]:
         try:
@@ -212,9 +225,24 @@ class MemoryClient:
                 return None
             raise
 
-    def get_document(self, bank: str, doc_id: str) -> Optional[dict]:
+    def get_document(self, bank: str, doc_id: str, timeout: float = 2.0) -> Optional[dict]:
         """Fetch document by doc_id from bank. Returns None if not found."""
-        return _bg_loop.run(self._aget_document(bank, doc_id))
+        return _bg_loop.run(self._aget_document(bank, doc_id), timeout=timeout)
+
+    def get_documents_batch(
+        self, bank: str, doc_ids: list[str], timeout: float = 2.5
+    ) -> list[dict]:
+        """Fetch multiple documents concurrently in one pass."""
+        if not doc_ids:
+            return []
+
+        async def _batch():
+            tasks = [self._aget_document(bank, d_id) for d_id in doc_ids]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            return [r for r in results if isinstance(r, dict)]
+
+        res = _bg_loop.run(_batch(), timeout=timeout)
+        return res if res is not None else []
 
     def retrieve(self, bank: str, query: str, top_k: int = 3) -> list[dict]:
         """
@@ -285,4 +313,5 @@ class MemoryClient:
             sorted_docs = sorted(doc_results.values(), key=lambda x: x["score"], reverse=True)
             return sorted_docs[:top_k]
 
-        return _bg_loop.run(_retrieve())
+        res = _bg_loop.run(_retrieve())
+        return res if res is not None else []

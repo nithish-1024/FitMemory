@@ -361,7 +361,7 @@ export function LandingScene() {
           >
             {/* Top Subtitle Pill */}
             <div className="pt-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-border/80 bg-ink-surface/80 backdrop-blur-md px-3.5 py-1 text-[11px] font-medium tracking-wider uppercase text-bone-subtle">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-ink/20 bg-white/60 backdrop-blur-md px-3.5 py-1 text-[11px] font-semibold tracking-wider uppercase text-ink shadow-sm">
                 <Sparkles className="h-3 w-3 text-indigo" />
                 <span>Editorial Wardrobe Experience</span>
               </span>
@@ -370,76 +370,69 @@ export function LandingScene() {
             {/* Central Editorial Typography & CTA */}
             <div className="flex flex-col items-center text-center space-y-5 max-w-md">
               <div className="space-y-2">
-                <h1 className="text-4xl sm:text-6xl font-serif font-light tracking-tight text-bone drop-shadow-lg">
+                <h1 className="font-serif font-black tracking-tight text-4xl sm:text-6xl text-[#12100E] uppercase drop-shadow-sm">
                   FitMemory
                 </h1>
-                <p className="text-xs sm:text-sm font-mono tracking-widest text-indigo uppercase font-medium">
+                <p className="text-xs sm:text-sm font-mono tracking-widest text-[#3B4CCF] uppercase font-bold">
                   Persistent Styling Intelligence
                 </p>
-                <p className="text-xs sm:text-sm text-bone-muted max-w-sm mx-auto font-sans leading-relaxed pt-1">
+                <p className="text-xs sm:text-sm text-[#2D2824] max-w-sm mx-auto font-sans leading-relaxed pt-1 font-medium">
                   Curated wardrobe and AI stylist for{" "}
-                  <span className="capitalize text-bone font-medium">
+                  <span className="capitalize text-[#12100E] font-bold">
                     {currentUser}
                   </span>
                   . Balancing silhouettes, tone theory, and learned preferences.
                 </p>
               </div>
 
-              {/* Prominent Bone-Colored Enter Button */}
+              {/* Primary CTA Button "Enter Wardrobe": Bold Deep Ink button with Bone text */}
               <div className="pointer-events-auto pt-2 flex flex-col items-center gap-3">
                 <Button
                   size="lg"
                   onClick={handleEnterWardrobe}
-                  className="bg-bone text-ink hover:bg-bone-muted text-sm font-semibold tracking-wide px-8 py-6 rounded-2xl shadow-2xl shadow-bone/10 transition-all duration-300 flex items-center gap-3 group"
+                  className="bg-[#141210] text-[#F5EFE6] hover:bg-[#25221F] text-sm font-semibold tracking-wide px-8 py-6 rounded-2xl shadow-2xl shadow-ink/20 transition-all duration-300 flex items-center gap-3 group"
                 >
                   <span>Enter Wardrobe</span>
-                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 text-ink" />
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 text-[#F5EFE6]" />
                 </Button>
 
                 {/* Wardrobe Items Visual Preview Strip */}
                 {wardrobe.length > 0 && (
                   <div className="flex items-center gap-2 pt-1">
-                    {wardrobe.slice(0, 5).map((item, idx) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setActiveIndex(idx);
-                          setHasEnteredWardrobe(true);
-                        }}
-                        className="group relative h-11 w-11 rounded-xl border border-ink-border bg-ink-elevated overflow-hidden hover:scale-110 hover:border-indigo transition-all duration-300 shadow-md"
-                        title={item.name}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={
-                            item.photo.startsWith("http")
-                              ? item.photo
-                              : item.photo.startsWith("/")
-                              ? item.photo
-                              : `/${item.photo}`
-                          }
-                          alt={item.name}
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (
-                              !target.dataset.triedFallback &&
-                              !item.photo.startsWith("http")
-                            ) {
-                              target.dataset.triedFallback = "true";
-                              target.src = `${API_BASE_URL}${
-                                item.photo.startsWith("/")
-                                  ? item.photo
-                                  : `/${item.photo}`
-                              }`;
-                            }
+                    {wardrobe.slice(0, 5).map((item, idx) => {
+                      const itemPhotoUrl = item.photo.startsWith("http")
+                        ? item.photo
+                        : `${API_BASE_URL}${item.photo.startsWith("/") ? item.photo : `/${item.photo}`}`;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveIndex(idx);
+                            setHasEnteredWardrobe(true);
                           }}
-                        />
-                      </button>
-                    ))}
+                          className="group relative h-11 w-11 rounded-xl border border-ink/20 bg-white/70 backdrop-blur-sm overflow-hidden hover:scale-110 hover:border-indigo transition-all duration-300 shadow-md"
+                          title={item.name}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={itemPhotoUrl}
+                            alt={item.name}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.dataset.triedFallback && !item.photo.startsWith("http")) {
+                                target.dataset.triedFallback = "true";
+                                target.src = item.photo.startsWith("/") ? item.photo : `/${item.photo}`;
+                              }
+                            }}
+                          />
+                        </button>
+                      );
+                    })}
                     <button
                       onClick={handleEnterWardrobe}
-                      className="h-11 px-2.5 rounded-xl border border-ink-border/80 bg-ink-surface/80 text-[10px] font-mono uppercase text-bone-subtle hover:text-bone hover:border-bone/30 transition-all flex items-center justify-center"
+                      className="h-11 px-2.5 rounded-xl border border-ink/20 bg-white/70 backdrop-blur-sm text-[10px] font-mono uppercase text-[#141210] font-semibold hover:bg-white hover:border-ink/40 transition-all flex items-center justify-center shadow-sm"
                     >
                       +{wardrobe.length > 5 ? wardrobe.length - 5 : "More"}
                     </button>

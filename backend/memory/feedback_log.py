@@ -48,40 +48,25 @@ def get_feedback_log(
     try:
         mem_client = client or MemoryClient()
         bank = f"{settings.user_bank_prefix}{user_id}_feedback_log"
-        doc_ids = mem_client.list_documents(bank=bank, limit=max(limit * 2, 50))
+        doc_ids = mem_client.list_documents(bank=bank, limit=limit)
+        if not doc_ids:
+            return []
+
+        docs = mem_client.get_documents_batch(bank=bank, doc_ids=doc_ids[:limit])
         entries: list[dict[str, Any]] = []
 
-        for d_id in doc_ids:
-            doc = mem_client.get_document(bank, d_id)
+        for doc in docs:
             if not doc:
                 continue
             content = doc.get("content")
             if not content:
                 continue
             try:
-                if isinstance(content, str):
-                    data = json.loads(content)
-                elif isinstance(content, dict):
-                    data = content
-                else:
-                    continue
-                entries.append(data)
+                data = json.loads(content) if isinstance(content, str) else content
+                if isinstance(data, dict):
+                    entries.append(data)
             except Exception:
                 continue
-
-        # If list_documents yielded no entries or bank empty, fallback to retrieve
-        if not entries:
-            results = mem_client.retrieve(bank, query="feedback interaction", top_k=limit)
-            for r in results:
-                content = r.get("content")
-                if not content:
-                    continue
-                try:
-                    data = json.loads(content) if isinstance(content, str) else content
-                    if isinstance(data, dict):
-                        entries.append(data)
-                except Exception:
-                    continue
 
         # Sort entries descending by ISO 8601 timestamp string
         entries.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)

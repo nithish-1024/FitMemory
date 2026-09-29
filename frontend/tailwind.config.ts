@@ -31,6 +31,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        serif: ["'Playfair Display'", "Didot", "Bodoni MT", "Cinzel", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

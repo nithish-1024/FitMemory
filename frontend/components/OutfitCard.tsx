@@ -30,6 +30,15 @@ interface OutfitCardProps {
   clarificationOptions: ClarificationOption[] | null;
 }
 
+function getResolvedPhotoUrl(photo?: string): string {
+  if (!photo) return "";
+  if (photo.startsWith("http://") || photo.startsWith("https://")) {
+    return photo;
+  }
+  const clean = photo.startsWith("/") ? photo : `/${photo}`;
+  return `${API_BASE_URL}${clean}`;
+}
+
 export function OutfitCard({
   outfit,
   onAccept,
@@ -60,10 +69,10 @@ export function OutfitCard({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 20 }}
         transition={springs.snappy}
-        className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl border border-ink-border bg-ink-surface text-bone shadow-2xl p-5 sm:p-8 flex flex-col space-y-6 relative"
+        className="w-full max-w-2xl max-h-[88vh] rounded-3xl border border-ink-border bg-ink-surface text-bone shadow-2xl flex flex-col overflow-hidden relative"
       >
-        {/* Header & Close */}
-        <div className="flex items-center justify-between border-b border-ink-border/70 pb-4">
+        {/* Header & Close (Fixed at top) */}
+        <div className="flex items-center justify-between border-b border-ink-border/70 px-5 sm:px-8 py-4 shrink-0 bg-ink-surface/90 backdrop-blur-md z-10">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-indigo animate-pulse" />
             <span className="text-xs font-mono uppercase tracking-widest text-indigo font-semibold">
@@ -83,6 +92,9 @@ export function OutfitCard({
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto px-5 sm:px-8 py-5 space-y-6">
 
         {/* ---------------- STEP 1: OUTFIT OVERVIEW ---------------- */}
         {!isClarificationStep && (
@@ -143,13 +155,7 @@ export function OutfitCard({
                         item.id === "new_curated_piece"
                     );
 
-                    const photo = item.photo?.startsWith("http")
-                      ? item.photo
-                      : item.photo?.startsWith("/")
-                      ? item.photo
-                      : item.photo
-                      ? `/${item.photo}`
-                      : "";
+                    const photo = getResolvedPhotoUrl(item.photo);
 
                     return (
                       <div
@@ -177,9 +183,9 @@ export function OutfitCard({
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
-                                if (!target.dataset.triedFallback && photo && !photo.startsWith("http")) {
+                                if (!target.dataset.triedFallback && !photo.startsWith("http")) {
                                   target.dataset.triedFallback = "true";
-                                  target.src = `${API_BASE_URL}${photo.startsWith("/") ? photo : `/${photo}`}`;
+                                  target.src = item.photo?.startsWith("/") ? item.photo : `/${item.photo}`;
                                 } else {
                                   target.style.display = "none";
                                 }
@@ -258,33 +264,6 @@ export function OutfitCard({
                 </div>
               )}
             </div>
-
-            {/* Action Buttons: Accept / Reject */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-              {/* Primary Accept Button */}
-              <Button
-                variant="indigo"
-                size="lg"
-                disabled={isSubmittingFeedback}
-                onClick={onAccept}
-                className="w-full sm:flex-1 py-5 rounded-2xl flex items-center justify-center gap-2 font-semibold text-sm shadow-xl shadow-indigo/25"
-              >
-                <Check className="h-4 w-4" />
-                <span>Accept Outfit</span>
-              </Button>
-
-              {/* Secondary Reject Button */}
-              <Button
-                variant="outline"
-                size="lg"
-                disabled={isSubmittingFeedback}
-                onClick={onReject}
-                className="w-full sm:flex-1 py-5 rounded-2xl border-ink-border hover:bg-ink-elevated flex items-center justify-center gap-2 font-medium text-sm text-bone-muted hover:text-bone"
-              >
-                <X className="h-4 w-4" />
-                <span>Pass & Clarify</span>
-              </Button>
-            </div>
           </div>
         )}
 
@@ -347,6 +326,36 @@ export function OutfitCard({
               </button>
             </div>
           </motion.div>
+        )}
+        </div>
+
+        {/* Sticky Action Footer: Accept & Pass buttons always visible without scrolling */}
+        {!isClarificationStep && (
+          <div className="shrink-0 border-t border-ink-border/70 bg-ink-surface/95 backdrop-blur-md px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-center gap-3 z-10">
+            {/* Primary Accept Button */}
+            <Button
+              variant="indigo"
+              size="lg"
+              disabled={isSubmittingFeedback}
+              onClick={onAccept}
+              className="w-full sm:flex-1 py-4 sm:py-5 rounded-2xl flex items-center justify-center gap-2 font-semibold text-sm shadow-xl shadow-indigo/25"
+            >
+              <Check className="h-4 w-4" />
+              <span>Accept Outfit</span>
+            </Button>
+
+            {/* Secondary Reject Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={isSubmittingFeedback}
+              onClick={onReject}
+              className="w-full sm:flex-1 py-4 sm:py-5 rounded-2xl border-ink-border hover:bg-ink-elevated flex items-center justify-center gap-2 font-medium text-sm text-bone-muted hover:text-bone"
+            >
+              <X className="h-4 w-4" />
+              <span>Pass & Clarify</span>
+            </Button>
+          </div>
         )}
       </motion.div>
     </div>

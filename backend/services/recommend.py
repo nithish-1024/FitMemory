@@ -152,8 +152,84 @@ def get_rule_based_fallback(
     return [wardrobe[0]["id"]] if wardrobe else []
 
 
+def get_model_description(user_id: str) -> str:
+    """Return gender-specific and model-specific editorial description."""
+    normalized = user_id.lower()
+    if normalized == "arjun":
+        return "Full-body fashion editorial lookbook photo of a stylish 20-something South Asian male model (Arjun), masculine tailoring, clean styled hair"
+    elif normalized == "sara":
+        return "Full-body fashion editorial lookbook photo of a stylish 20-something South Asian female model (Sara), feminine tailoring, elegant posture"
+    else:
+        return f"Full-body fashion editorial lookbook photo of a stylish 20-something model ({user_id}), elegant tailoring"
+
+
+def build_discovered_product_image_url(item_name: str, color: str, category: str) -> str:
+    """Build an isolated product photograph URL for a newly discovered fashion piece."""
+    prompt = (
+        f"Studio product catalog photo of a luxury {color} {item_name} {category}, "
+        "ghost mannequin or flat lay on soft neutral studio background, 8k resolution, crisp clean lighting, designer fashion"
+    )
+    encoded = urllib.parse.quote(prompt.strip())
+    return f"https://image.pollinations.ai/prompt/{encoded}?width=400&height=400&model=flux&nologo=true"
+
+
+def format_final_image_prompt(
+    user_id: str,
+    chosen_items: list[dict[str, Any]],
+    raw_prompt: Optional[str] = None,
+) -> str:
+    """Ensure image_prompt strictly matches model gender, exact garments, and luxury studio lookbook standard."""
+    model_desc = get_model_description(user_id)
+    garments_list = []
+    for it in chosen_items:
+        name = it.get("name", "")
+        attrs = it.get("attributes", {})
+        color = attrs.get("color", "")
+        cat = attrs.get("type", "")
+        if color and color.lower() not in name.lower():
+            garments_list.append(f"{color} {name}")
+        else:
+            garments_list.append(name)
+    garments_desc = ", ".join(garments_list)
+
+    studio_setting = (
+        "standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, "
+        "photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, confident posture"
+    )
+
+    if not raw_prompt or raw_prompt == FALLBACK_IMAGE_PROMPT:
+        return f"{model_desc}, wearing {garments_desc}, {studio_setting}."
+
+    prompt_lower = raw_prompt.lower()
+    normalized_user = user_id.lower()
+
+    if normalized_user == "arjun":
+        cleaned = re.sub(
+            r"(?i)\b(a stylish person|a female model|a woman|female model|female)\b",
+            "",
+            raw_prompt,
+        ).strip()
+        cleaned = re.sub(r"^,\s*", "", cleaned)
+        if "male model" not in prompt_lower and "arjun" not in prompt_lower:
+            return f"{model_desc}, wearing {garments_desc}, {cleaned if cleaned else studio_setting}"
+        return cleaned
+
+    if normalized_user == "sara":
+        cleaned = re.sub(
+            r"(?i)\b(a stylish person|a male model|a man|male model|male)\b",
+            "",
+            raw_prompt,
+        ).strip()
+        cleaned = re.sub(r"^,\s*", "", cleaned)
+        if "female model" not in prompt_lower and "sara" not in prompt_lower:
+            return f"{model_desc}, wearing {garments_desc}, {cleaned if cleaned else studio_setting}"
+        return cleaned
+
+    return raw_prompt
+
+
 def get_discover_fallback(
-    wardrobe: list[dict[str, Any]], exclude: list[Any]
+    wardrobe: list[dict[str, Any]], exclude: list[Any], user_id: str = "arjun"
 ) -> tuple[list[str], dict[str, Any], str, str]:
     """Fallback for discover mode when LLM is unavailable."""
     base_item = (
@@ -189,13 +265,15 @@ def get_discover_fallback(
         "fit": "relaxed",
         "reasoning": new_desc,
         "description": new_desc,
+        "photo": build_discovered_product_image_url(new_name, new_color, new_cat),
     }
     reasoning = (
         f"This {new_color} {new_name} introduces a tailored proportion that balances the {base_item.get('name', 'owned piece')}. "
         "The curated pairing establishes tonal depth according to core color theory principles."
     )
+    model_desc = get_model_description(user_id)
     image_prompt = (
-        f"Full-body fashion editorial lookbook photography of a stylish person wearing {base_item.get('name', 'owned wardrobe piece')} "
+        f"{model_desc}, wearing {base_item.get('name', 'owned wardrobe piece')} "
         f"paired with a new {new_color} {new_name}, standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture."
     )
     return [base_item["id"]], new_item, reasoning, image_prompt
@@ -342,9 +420,12 @@ def recommend(
     ]
 
     # 4. System Prompt by Mode
+    model_desc = get_model_description(user_id)
+
     if mode == "discover":
         system_prompt = (
             "You are an expert personal stylist and wardrobe curator.\n"
+            f"Target Model: {model_desc}.\n"
             "The user wants to DISCOVER a brand-new clothing piece to add to their wardrobe that pairs with 1-2 pieces they already own.\n"
             f"Follow these styling rules:\n{kb_rules_text}\n\n"
             f"Learned user preferences (respect these):\n{profile_text}\n\n"
@@ -352,7 +433,7 @@ def recommend(
             "1. Select 1 or 2 item_ids from the user's available wardrobe list that will form the base.\n"
             "2. Invent ONE new complementary fashion piece ('new_item') with 'id' ('new_piece_suggested'), 'name', 'category', 'color', 'fit', and 'reasoning' (explaining why it elevates the wardrobe).\n"
             "3. Provide 'reasoning' in exactly 2 sentences explaining why this new item pairs harmoniously with the chosen owned piece(s).\n"
-            "4. Provide 'image_prompt' following this template: Full-body fashion editorial lookbook photography of a stylish person wearing [exact items], standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture.\n\n"
+            f"4. Provide 'image_prompt' strictly following this template: {model_desc}, wearing [EXACT GARMENTS AND COLORS], standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, confident posture.\n\n"
             "Return strict JSON only in this format:\n"
             "{\n"
             '  "item_ids": ["owned_id_1"],\n'
@@ -372,13 +453,14 @@ def recommend(
     else:
         system_prompt = (
             "You are a personal stylist agent. Use ONLY items from the wardrobe list.\n"
+            f"Target Model: {model_desc}.\n"
             f"Follow these fashion rules:\n{kb_rules_text}\n\n"
             f"Learned user preferences (respect these):\n{profile_text}\n\n"
             'Return strict JSON only: {"item_ids": [...], "reasoning": "...", "image_prompt": "..."}.\n'
             "item_ids: 2-4 ids from the wardrobe, must form a wearable outfit (one top or dress, "
             "one bottom unless a dress, footwear if available).\n"
             "reasoning: exactly 2 sentences, naming the specific rule or learned preference applied.\n"
-            "image_prompt: Full-body fashion editorial lookbook photography of a stylish person wearing these exact items, standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, elegant posture."
+            f"image_prompt: {model_desc}, wearing [EXACT GARMENTS AND COLORS], standing in a minimalist architectural studio, soft diffuse daylight, Vogue magazine aesthetic, photorealistic fabric textures, 35mm film, hyper-realistic, 8k resolution, confident posture."
         )
         user_message = (
             f"Wardrobe items:\n{json.dumps(compact_wardrobe)}\n\n"
@@ -481,12 +563,13 @@ def recommend(
         used_fallback = True
         if mode == "discover":
             chosen_item_ids, new_item_data, reasoning, image_prompt = (
-                get_discover_fallback(available_wardrobe, exclude_outfit_sets)
+                get_discover_fallback(available_wardrobe, exclude_outfit_sets, user_id=user_id)
             )
         else:
             chosen_item_ids = get_rule_based_fallback(available_wardrobe, exclude_outfit_sets)
             reasoning = FALLBACK_REASONING
-            image_prompt = FALLBACK_IMAGE_PROMPT
+            fallback_items = [wardrobe_by_id[i] for i in chosen_item_ids if i in wardrobe_by_id]
+            image_prompt = format_final_image_prompt(user_id, fallback_items)
 
     # 6. Build items array
     chosen_items = [
@@ -508,11 +591,16 @@ def recommend(
                 "description", "A curated piece to complement your existing wardrobe."
             )
         )
+        curated_name = new_item_data.get("name", "Curated Discovery Piece")
+        curated_photo_url = new_item_data.get("photo") or build_discovered_product_image_url(
+            curated_name, color_val, cat_val
+        )
+        new_item_data["photo"] = curated_photo_url
 
         new_wardrobe_item = {
             "id": curated_item_id,
-            "name": new_item_data.get("name", "Curated Discovery Piece"),
-            "photo": "",
+            "name": curated_name,
+            "photo": curated_photo_url,
             "attributes": {
                 "color": color_val,
                 "type": cat_val,
@@ -527,7 +615,8 @@ def recommend(
     # 7. Compute attributes_used
     attributes_used = compute_attributes_used(chosen_items)
 
-    # 8. image_url
+    # 8. Ensure image_prompt strictly matches model gender and exact garments, then build URL
+    image_prompt = format_final_image_prompt(user_id, chosen_items, image_prompt)
     image_url = build_image_url(image_prompt)
     profile_applied = has_learned_preferences and not used_fallback
 
